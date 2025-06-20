@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Flash Chatbox</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="w-full max-w-xl mx-auto bg-white rounded-lg shadow-lg flex flex-col h-[80vh]">
+        <div class="p-4 border-b text-xl font-bold text-blue-700 flex items-center gap-2">
+            <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 16.5A2.5 2.5 0 0118.5 19h-13A2.5 2.5 0 013 16.5v-9A2.5 2.5 0 015.5 5h13A2.5 2.5 0 0121 7.5v9z"/></svg>
+            Gemini Flash Chatbox
+        </div>
+        <div id="chat" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50"></div>
+        <form id="chat-form" class="p-4 border-t flex flex-col gap-2 bg-white">
+            <div class="flex gap-2">
+                <input id="prompt" name="prompt" type="text" placeholder="Tulis prompt..." class="flex-1 px-3 py-2 border rounded focus:outline-none focus:ring" required>
+                <select id="mode" class="border rounded px-2 py-2">
+                    <option value="text">Text</option>
+                    <option value="file">Image</option>
+                    <option value="document">Document</option>
+                    <option value="audio">Audio</option>
+                </select>
+            </div>
+            <div class="flex gap-2" id="file-inputs">
+                <input id="file" name="file" type="file" class="hidden" accept="image/*">
+                <input id="document" name="document" type="file" class="hidden" accept=".pdf,.doc,.docx,.txt">
+                <input id="audio" name="audio" type="file" class="hidden" accept="audio/*">
+                <label id="file-label" for="file" class="cursor-pointer px-3 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 hidden">Pilih Gambar</label>
+                <label id="document-label" for="document" class="cursor-pointer px-3 py-2 bg-green-100 text-green-700 rounded hover:bg-green-200 hidden">Pilih Dokumen</label>
+                <label id="audio-label" for="audio" class="cursor-pointer px-3 py-2 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 hidden">Pilih Audio</label>
+                <span id="filename" class="text-sm text-gray-500"></span>
+            </div>
+            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">Kirim</button>
+        </form>
+    </div>
+    <script>
+        const chat = document.getElementById('chat');
+        const form = document.getElementById('chat-form');
+        const promptInput = document.getElementById('prompt');
+        const modeSelect = document.getElementById('mode');
+        const fileInput = document.getElementById('file');
+        const documentInput = document.getElementById('document');
+        const audioInput = document.getElementById('audio');
+        const fileLabel = document.getElementById('file-label');
+        const documentLabel = document.getElementById('document-label');
+        const audioLabel = document.getElementById('audio-label');
+        const filenameSpan = document.getElementById('filename');
+
+        function addMessage(role, text) {
+            const div = document.createElement('div');
+            div.className = role === 'user'
+                ? 'text-right'
+                : 'text-left';
+            div.innerHTML = `
+                <div class="inline-block px-4 py-2 rounded-lg ${role === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800'} max-w-[80%]">
+                    ${text.replace(/\n/g, '<br>')}
+                </div>
+            `;
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function resetFileInputs() {
+            fileInput.value = '';
+            documentInput.value = '';
+            audioInput.value = '';
+            filenameSpan.textContent = '';
+        }
+
+        function updateFileInputs() {
+            fileLabel.classList.add('hidden');
+            documentLabel.classList.add('hidden');
+            audioLabel.classList.add('hidden');
+            resetFileInputs();
+            if (modeSelect.value === 'file') fileLabel.classList.remove('hidden');
+            if (modeSelect.value === 'document') documentLabel.classList.remove('hidden');
+            if (modeSelect.value === 'audio') audioLabel.classList.remove('hidden');
+        }
+
+        modeSelect.addEventListener('change', updateFileInputs);
+
+        [fileInput, documentInput, audioInput].forEach(input => {
+            input.addEventListener('change', () => {
+                filenameSpan.textContent = input.files[0] ? input.files[0].name : '';
+            });
+        });
+
+    form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const prompt = promptInput.value.trim();
+            const mode = modeSelect.value;
+            if (!prompt) return;
+        
+            addMessage('user', prompt + (filenameSpan.textContent ? `<br><span class="text-xs text-gray-400">${filenameSpan.textContent}</span>` : ''));
+            promptInput.value = '';
+            filenameSpan.textContent = '';
+        
+            let url = 'http://localhost:3000/generate-text';
+            let options = {};
+        
+            if (mode === 'text') {
+                url = 'http://localhost:3000/generate-text';
+                options = {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt })
+                };
+            } else {
+                let formData = new FormData();
+                formData.append('prompt', prompt);
+                if (mode === 'file' && fileInput.files[0]) {
+                    formData.append('file', fileInput.files[0]);
+                    url = 'http://localhost:3000/generate-from-file';
+                } else if (mode === 'document' && documentInput.files[0]) {
+                    formData.append('document', documentInput.files[0]);
+                    url = 'http://localhost:3000/generate-from-document';
+                } else if (mode === 'audio' && audioInput.files[0]) {
+                    formData.append('audio', audioInput.files[0]);
+                    url = 'http://localhost:3000/generate-from-audio';
+                } else {
+                    addMessage('system', 'File belum dipilih.');
+                    return;
+                }
+                options = { method: 'POST', body: formData };
+            }
+        
+            addMessage('system', '<span class="italic text-gray-400">Sedang memproses...</span>');
+        
+            try {
+                const res = await fetch(url, options);
+                const data = await res.json();
+                chat.lastChild.remove();
+                if (data.output) {
+                    addMessage('bot', data.output);
+                } else if (data.error) {
+                    addMessage('bot', `<span class="text-red-500">${data.error}</span>`);
+                } else {
+                    addMessage('bot', '<span class="text-red-500">Terjadi kesalahan tak diketahui.</span>');
+                }
+            } catch (err) {
+                chat.lastChild.remove();
+                addMessage('bot', '<span class="text-red-500">Gagal terhubung ke server.</span>');
+            }
+            resetFileInputs();
+        });
+
+        updateFileInputs();
+    </script>
+</body>
+</html>
